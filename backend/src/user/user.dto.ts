@@ -9,6 +9,5 @@ export class UserDto {
 }
 
 export class CreateUserDto {
-  message: string;
-  user: UserDto;
+  access_token: string;
 }

@@ -11,6 +11,7 @@ import {
   FilteredTransactionResponseDto,
 } from './transaction.dto';
 import { UserService } from 'src/user/user.service';
+import { tryCatch } from 'src/utils/try-catch';
 
 @Injectable()
 export class TransactionService {
@@ -26,24 +27,26 @@ export class TransactionService {
     category: string,
     description: string,
   ): Promise<string> {
-    if (!type || !amount || !date || !category) {
-      throw new Error('All fields are required');
-    }
+    return tryCatch(async () => {
+      if (!type || !amount || !date || !category) {
+        throw new Error('All fields are required');
+      }
 
-    // In a real application, you would get the userId from the authenticated user context
-    const user = await this.userService.getOne(1);
-    const transaction = this.repo.create({
-      type,
-      amount,
-      date,
-      category,
-      description,
-      user,
-      userId: user.id,
-    });
-    user.transactions = [...(user.transactions || []), transaction];
-    await this.repo.save(transaction);
-    return 'Transaction created successfully';
+      // In a real application, you would get the userId from the authenticated user context
+      const user = await this.userService.getOne(1);
+      const transaction = this.repo.create({
+        type,
+        amount,
+        date,
+        category,
+        description,
+        user,
+        userId: user.id,
+      });
+      user.transactions = [...(user.transactions || []), transaction];
+      await this.repo.save(transaction);
+      return 'Transaction created successfully';
+    }, 'Error creating transaction');
   }
 
   async getAllTransactions({
@@ -58,50 +61,52 @@ export class TransactionService {
     category,
     userId,
   }: FilteredTransactionDto): Promise<FilteredTransactionResponseDto> {
-    const [sortField, sortOrder] = sort.split('_');
+    return tryCatch(async () => {
+      const [sortField, sortOrder] = sort.split('_');
 
-    if (!userId) {
-      throw new ForbiddenException('User is not authenticated');
-    }
-    const filters: any = { userId }; // Default to userId 1 for demonstration
+      if (!userId) {
+        throw new ForbiddenException('User is not authenticated');
+      }
+      const filters: any = { userId }; // Default to userId 1 for demonstration
 
-    if (search) {
-      filters.description = ILike(`%${search}%`);
-    }
+      if (search) {
+        filters.description = ILike(`%${search}%`);
+      }
 
-    if (category) {
-      filters.category = category;
-    }
+      if (category) {
+        filters.category = category;
+      }
 
-    if (type) {
-      filters.type = type;
-    }
+      if (type) {
+        filters.type = type;
+      }
 
-    if (amount) {
-      filters.amount = LessThanOrEqual(amount);
-    }
-    if (startDate) {
-      filters.date = MoreThanOrEqual(new Date(startDate));
-    }
-    if (endDate) {
-      filters.date = LessThanOrEqual(new Date(endDate));
-    }
-    const [items, total] = await this.repo.findAndCount({
-      where: filters,
-      order: {
-        [sortField]: sortOrder.toUpperCase(), // 'ASC' or 'DESC'
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+      if (amount) {
+        filters.amount = LessThanOrEqual(amount);
+      }
+      if (startDate) {
+        filters.date = MoreThanOrEqual(new Date(startDate));
+      }
+      if (endDate) {
+        filters.date = LessThanOrEqual(new Date(endDate));
+      }
+      const [items, total] = await this.repo.findAndCount({
+        where: filters,
+        order: {
+          [sortField]: sortOrder.toUpperCase(), // 'ASC' or 'DESC'
+        },
+        skip: (page - 1) * limit,
+        take: limit,
+      });
 
-    return {
-      items,
-      total,
-      page,
-      limit,
-      hasMore: page * limit < total,
-    };
+      return {
+        items,
+        total,
+        page,
+        limit,
+        hasMore: page * limit < total,
+      };
+    }, 'Error fetching transactions');
   }
   async getTransactionById(id: number): Promise<Transaction> {
     const transaction = await this.repo.findOneBy({ id });
@@ -118,26 +123,30 @@ export class TransactionService {
     category: string,
     description: string,
   ): Promise<string> {
-    const transaction = await this.getTransactionById(id);
-    if (!transaction) {
-      throw new NotFoundException('Transaction not found');
-    }
+    return tryCatch(async () => {
+      const transaction = await this.getTransactionById(id);
+      if (!transaction) {
+        throw new NotFoundException('Transaction not found');
+      }
 
-    if (type) transaction.type = type;
-    if (amount) transaction.amount = amount;
-    if (date) transaction.date = date;
-    if (category) transaction.category = category;
-    if (description) transaction.description = description;
+      if (type) transaction.type = type;
+      if (amount) transaction.amount = amount;
+      if (date) transaction.date = date;
+      if (category) transaction.category = category;
+      if (description) transaction.description = description;
 
-    await this.repo.save(transaction);
-    return 'Transaction updated successfully';
+      await this.repo.save(transaction);
+      return 'Transaction updated successfully';
+    }, 'Error updating transaction');
   }
   async deleteTransaction(id: number): Promise<string> {
-    const transaction = await this.getTransactionById(id);
-    if (!transaction) {
-      throw new NotFoundException('Transaction not found');
-    }
-    await this.repo.remove(transaction);
-    return 'Transaction deleted successfully';
+    return tryCatch(async () => {
+      const transaction = await this.getTransactionById(id);
+      if (!transaction) {
+        throw new NotFoundException('Transaction not found');
+      }
+      await this.repo.remove(transaction);
+      return 'Transaction deleted successfully';
+    }, 'Error deleting transaction');
   }
 }
