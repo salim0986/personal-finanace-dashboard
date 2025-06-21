@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Journal } from './journal.entity';
 import { ILike, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
@@ -55,21 +59,30 @@ export class JournalService {
     }, 'Error fetching journals');
   }
 
-  async getJournalById(id: number): Promise<Journal> {
+  async getJournalById(id: number, userId: number): Promise<Journal> {
     return tryCatch(async () => {
       const journal = await this.repo.findOneBy({ id });
+      if (journal.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       if (!journal) {
         throw new NotFoundException('Journal not found');
       }
       return journal;
     }, 'Error fetching journal by ID');
   }
-  async createJournal(title: string, content: string): Promise<string> {
+  async createJournal(
+    title: string,
+    content: string,
+    userId: number,
+  ): Promise<string> {
     return tryCatch(async () => {
       if (!title || !content) {
         throw new Error('Title and content are required');
       }
-      const user = await this.userService.getOne(1);
+      const user = await this.userService.getOne(userId);
       const journal = this.repo.create({
         title,
         content,
@@ -78,16 +91,22 @@ export class JournalService {
       });
       user.journals = [...(user.journals || []), journal];
       await this.repo.save(journal);
-      return 'Goal created successfully';
+      return 'Journal created successfully';
     }, 'Error creating journal');
   }
   async updateJournal(
     id: number,
+    userId: number,
     title?: string,
     content?: string,
   ): Promise<string> {
     return tryCatch(async () => {
-      const journal = await this.getJournalById(id);
+      const journal = await this.getJournalById(id, userId);
+      if (journal.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       if (!journal) {
         throw new NotFoundException('Journal not found');
       }
@@ -99,9 +118,14 @@ export class JournalService {
       return 'Journal updated successfully';
     }, 'Error updating journal');
   }
-  async deleteJournal(id: number): Promise<string> {
+  async deleteJournal(id: number, userId: number): Promise<string> {
     return tryCatch(async () => {
-      const journal = await this.getJournalById(id);
+      const journal = await this.getJournalById(id, userId);
+      if (journal.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       if (!journal) {
         throw new NotFoundException('Journal not found');
       }

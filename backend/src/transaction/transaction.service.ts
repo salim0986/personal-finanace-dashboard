@@ -26,6 +26,7 @@ export class TransactionService {
     date: Date,
     category: string,
     description: string,
+    userId: number,
   ): Promise<string> {
     return tryCatch(async () => {
       if (!type || !amount || !date || !category) {
@@ -33,7 +34,7 @@ export class TransactionService {
       }
 
       // In a real application, you would get the userId from the authenticated user context
-      const user = await this.userService.getOne(1);
+      const user = await this.userService.getOne(userId);
       const transaction = this.repo.create({
         type,
         amount,
@@ -64,9 +65,6 @@ export class TransactionService {
     return tryCatch(async () => {
       const [sortField, sortOrder] = sort.split('_');
 
-      if (!userId) {
-        throw new ForbiddenException('User is not authenticated');
-      }
       const filters: any = { userId }; // Default to userId 1 for demonstration
 
       if (search) {
@@ -108,8 +106,13 @@ export class TransactionService {
       };
     }, 'Error fetching transactions');
   }
-  async getTransactionById(id: number): Promise<Transaction> {
+  async getTransactionById(id: number, userId: number): Promise<Transaction> {
     const transaction = await this.repo.findOneBy({ id });
+    if (transaction.userId != userId) {
+      throw new ForbiddenException(
+        'Your are not allowed to read or write this request.',
+      );
+    }
     if (!transaction) {
       throw new NotFoundException('Transaction not found');
     }
@@ -117,6 +120,7 @@ export class TransactionService {
   }
   async updateTransaction(
     id: number,
+    userId: number,
     type: string,
     amount: number,
     date: Date,
@@ -124,7 +128,12 @@ export class TransactionService {
     description: string,
   ): Promise<string> {
     return tryCatch(async () => {
-      const transaction = await this.getTransactionById(id);
+      const transaction = await this.getTransactionById(id, userId);
+      if (transaction.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       if (!transaction) {
         throw new NotFoundException('Transaction not found');
       }
@@ -139,9 +148,9 @@ export class TransactionService {
       return 'Transaction updated successfully';
     }, 'Error updating transaction');
   }
-  async deleteTransaction(id: number): Promise<string> {
+  async deleteTransaction(id: number, userId: number): Promise<string> {
     return tryCatch(async () => {
-      const transaction = await this.getTransactionById(id);
+      const transaction = await this.getTransactionById(id, userId);
       if (!transaction) {
         throw new NotFoundException('Transaction not found');
       }

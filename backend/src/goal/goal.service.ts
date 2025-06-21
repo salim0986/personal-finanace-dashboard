@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Goal } from './goal.entity';
 import { ILike, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
@@ -65,9 +69,14 @@ export class GoalService {
       };
     }, 'Error fetching goals');
   }
-  async getGoalById(id: number): Promise<Goal> {
+  async getGoalById(id: number, userId: number): Promise<Goal> {
     return tryCatch(async () => {
       const goal = await this.repo.findOneBy({ id });
+      if (goal.userId != userId) {
+        throw new ForbiddenException(
+          'You are not allowed to read or write this request!',
+        );
+      }
       if (!goal) {
         throw new NotFoundException('Goal not found');
       }
@@ -78,6 +87,7 @@ export class GoalService {
     title: string,
     targetAmount: number,
     deadline: Date,
+    userId: number,
   ): Promise<string> {
     return tryCatch(async () => {
       if (!title) {
@@ -89,7 +99,7 @@ export class GoalService {
       if (!deadline) {
         throw new Error('Deadline is required');
       }
-      const user = await this.userService.getOne(1);
+      const user = await this.userService.getOne(userId);
       const goal = this.repo.create({
         title,
         targetAmount,
@@ -104,6 +114,7 @@ export class GoalService {
   }
   async updateGoal(
     id: number,
+    userId: number,
     title?: string,
     targetAmount?: number,
     sum?: number,
@@ -111,12 +122,16 @@ export class GoalService {
     status?: string,
   ): Promise<string> {
     return tryCatch(async () => {
-      const goal = await this.getGoalById(id);
-
+      const goal = await this.getGoalById(id, userId);
+      if (goal.userId != userId) {
+        throw new ForbiddenException(
+          'You are not allowed to read or write this request!',
+        );
+      }
       if (title) goal.title = title;
       if (targetAmount) goal.targetAmount = targetAmount;
       if (sum) {
-        goal.currentAmount += sum;
+        goal.currentAmount = +goal.currentAmount + sum;
         goal.history.push({ date: new Date(), amount: sum });
         if (goal.currentAmount >= goal.targetAmount) {
           goal.status = 'completed';
@@ -129,9 +144,9 @@ export class GoalService {
       return 'Goal updated successfully';
     }, 'Error updating goal');
   }
-  async updateAllGoalStatus(): Promise<void> {
+  async updateAllGoalStatus(userId: number): Promise<void> {
     return tryCatch(async () => {
-      const goals = await this.repo.find();
+      const goals = await this.repo.findBy({ userId });
       const now = new Date();
       for (const goal of goals) {
         if (goal.currentAmount >= goal.targetAmount) {
@@ -145,9 +160,14 @@ export class GoalService {
       }
     }, 'Error updating all goal statuses');
   }
-  async deleteGoal(id: number): Promise<string> {
+  async deleteGoal(id: number, userId: number): Promise<string> {
     return tryCatch(async () => {
-      const goal = await this.getGoalById(id);
+      const goal = await this.getGoalById(id, userId);
+      if (goal.userId != userId) {
+        throw new ForbiddenException(
+          'You are not allowed to read or write this request!',
+        );
+      }
       await this.repo.remove(goal);
       return 'Goal deleted successfully';
     }, 'Error deleting goal');

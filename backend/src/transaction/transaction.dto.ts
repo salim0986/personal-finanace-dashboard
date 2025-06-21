@@ -10,7 +10,7 @@ export class FilteredTransactionDto {
   startDate?: Date;
   endDate?: Date;
   category?: string;
-  userId?: number;
+  userId: number;
 }
 
 export class FilteredTransactionResponseDto {

@@ -7,6 +7,7 @@ import {
   Post,
   Put,
   Query,
+  Request,
 } from '@nestjs/common';
 import { JournalService } from './journal.service';
 import {
@@ -16,6 +17,7 @@ import {
   UpdateJournalDto,
 } from './journal.dto';
 import { Journal } from './journal.entity';
+import { RequestUserDTO } from 'src/utils/user-dto';
 
 @Controller('journal')
 export class JournalController {
@@ -24,31 +26,52 @@ export class JournalController {
   @Get('all')
   getAllJournals(
     @Query() query: FilteredJournalDto,
+    @Request() request: Request & RequestUserDTO,
   ): Promise<FilteredJournalResponseDto> {
-    return this.journalService.getAllJournals(query);
+    return this.journalService.getAllJournals({
+      ...query,
+      userId: request.user.id,
+    });
   }
   @Get(':id')
-  getJournalById(@Param('id') id: number): Promise<Journal> {
-    return this.journalService.getJournalById(id);
+  getJournalById(
+    @Param('id') id: number,
+    @Request() request: Request & RequestUserDTO,
+  ): Promise<Journal> {
+    return this.journalService.getJournalById(id, request.user.id);
   }
 
   @Post('create')
   createJournal(
     @Body()
     body: CreateJournalDto,
+    @Request() request: Request & RequestUserDTO,
   ): Promise<string> {
-    return this.journalService.createJournal(body.title, body.content);
+    return this.journalService.createJournal(
+      body.title,
+      body.content,
+      request.user.id,
+    );
   }
   @Put('update/:id')
   updateJournal(
     @Param('id') id: number,
+    @Request() request: Request & RequestUserDTO,
     @Body()
     body: UpdateJournalDto,
   ): Promise<string> {
-    return this.journalService.updateJournal(id, body.title, body.content);
+    return this.journalService.updateJournal(
+      id,
+      request.user.id,
+      body.title,
+      body.content,
+    );
   }
   @Delete('delete/:id')
-  deleteJournal(@Param('id') id: number): Promise<string> {
-    return this.journalService.deleteJournal(id);
+  deleteJournal(
+    @Param('id') id: number,
+    @Request() request: Request & RequestUserDTO,
+  ): Promise<string> {
+    return this.journalService.deleteJournal(id, request.user.id);
   }
 }

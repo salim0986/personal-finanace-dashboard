@@ -1,7 +1,7 @@
 import { ILike, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { Asset } from './asset.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { UserService } from 'src/user/user.service';
 import { FilteredAssetDto, FilteredAssetResponseDto } from './asset.dto';
 import { tryCatch } from 'src/utils/try-catch';
@@ -65,9 +65,14 @@ export class AssetService {
       };
     }, 'Error fetching assets');
   }
-  async getAssetById(id: number): Promise<Asset> {
+  async getAssetById(id: number, userId: number): Promise<Asset> {
     return tryCatch(async () => {
       const asset = await this.repo.findOneBy({ id });
+      if (asset.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       if (!asset) {
         throw new Error('Asset not found');
       }
@@ -79,6 +84,7 @@ export class AssetService {
     category: string,
     description: string,
     amount: number,
+    userId: number,
   ): Promise<string> {
     return tryCatch(async () => {
       if (!type) {
@@ -90,7 +96,7 @@ export class AssetService {
       if (!amount) {
         throw new Error('Amount is required');
       }
-      const user = await this.userService.getOne(1);
+      const user = await this.userService.getOne(userId);
       const asset = this.repo.create({
         type,
         amount,
@@ -106,14 +112,19 @@ export class AssetService {
   }
   async updateAsset(
     id: number,
+    userId: number,
     type?: string,
     amount?: number,
     category?: string,
     description?: string,
   ): Promise<string> {
     return tryCatch(async () => {
-      const asset = await this.getAssetById(id);
-
+      const asset = await this.getAssetById(id, userId);
+      if (asset.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       if (type) asset.type = type;
       if (amount) asset.amount = amount;
       if (category) {
@@ -125,9 +136,14 @@ export class AssetService {
       return 'Asset updated successfully';
     }, 'Error updating asset');
   }
-  async deleteAsset(id: number): Promise<string> {
+  async deleteAsset(id: number, userId: number): Promise<string> {
     return tryCatch(async () => {
-      const asset = await this.getAssetById(id);
+      const asset = await this.getAssetById(id, userId);
+      if (asset.userId != userId) {
+        throw new ForbiddenException(
+          'Your are not allowed to read or write this request.',
+        );
+      }
       await this.repo.remove(asset);
       return 'Asset deleted successfully';
     }, 'Error deleting asset');
